@@ -1,0 +1,111 @@
+---
+title: "Reproducible Result Assignemnt1"
+author: "Abhinav"
+date: "19 May 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Set up the environment
+```{r setup_environment, include=FALSE}
+library(dplyr)
+library(lattice)
+getwd()
+```
+#1. Read data
+
+``` {r READ_data, echo=TRUE}
+ DF<- read.csv("activity.csv")
+ str(DF)
+ head(DF)
+```
+
+##Analyze the data
+``` {r Analyze_data, echo=TRUE}
+ Steps_Data <- summarise(group_by(DF, date), Total_Daily_Steps=sum(steps) ,n())
+ head(Steps_Data)
+ 
+```
+
+#2. Histogram- Number of steps per day
+``` {r HIstogram_Number_Steps_Per_DAY, echo=TRUE} 
+ x <-as.numeric(na.omit(Steps_Data$Total_Daily_Steps))
+ hist(x, breaks=10, main= "Total Number of Steps Taken per Day",col="green", xlab= "Total No of Steps",axes= TRUE)
+```
+
+#3. Mean, Median No of Steps
+``` {r MEAN_MEDIAN, echo=TRUE}
+mean(Steps_Data$Total_Daily_Steps,na.rm= TRUE)
+median(Steps_Data$Total_Daily_Steps,na.rm= TRUE)
+``` 
+
+#4. Average Daily Activity Pattern- Average number of steps taken
+``` {r Average_steps, echo=TRUE}
+avg_step <- aggregate(steps ~ interval, data = DF, mean, na.rm = TRUE)
+plot(avg_step$interval, avg_step$steps, type = "l", lwd = 2, col = "navy",
+     main = "Time Series: Average Number of Steps Taken", axes = TRUE,
+     xlab = "5-minute interval", ylab = "Average number of steps")
+```
+
+#5.  Which 5 Min interval contains maximum number of steps?
+``` {r Max_steps_per_5min_Interval, echo=TRUE}
+avg_step$interval[which.max(avg_step$steps)]
+```
+
+#Imputing missing values
+## Total number of missing values
+``` {r Number_NA, echo=TRUE}
+sum(is.na(DF))
+```
+
+#6. Strategy for filling in null values - 
+##Replace missing data with mean of that column, use mean of 5 min interval corresponding to missing value. Create a new dataset with missing values filled in
+``` {r Filling_in_null_values, echo=TRUE}
+New_DF <- DF
+
+for(i in 1:nrow(DF))    
+  {
+    if (is.na(New_DF[i,1]))
+     {
+       int_5= New_DF[i,3]
+       New_DF[i,1] <- mean(New_DF$steps[New_DF$interval== int_5],na.rm=TRUE)
+     }
+  }
+ head(New_DF)
+```
+
+#7. Histogram of the total number of steps taken each day and report the mean and median total number of steps taken per day.
+``` {r Total_number_of_steps_taken_each_day, echo=TRUE}
+New_x <- summarise (group_by(New_DF, date), Total_Daily_Steps=sum(steps) ,n())
+  
+  a <- as.numeric(New_x$Total_Daily_Steps)
+  hist(a,breaks=10, main='Total number of steps taken each day-NA replaced',   xlab='Steps', ylim=c(0,30),axes= TRUE, col= "green")
+```
+
+##Mean, Median No of Steps
+``` {r Mean_Median_Steps, echo=TRUE}
+mean(New_x$Total_Daily_Steps,na.rm= TRUE)
+median(New_x$Total_Daily_Steps,na.rm= TRUE)
+```
+
+
+##New factor variable in the dataset with two levels - "weekdays" and "weekend" indicating whether a given date is a weekday or weekend day.
+``` {r New_factor_variable, echo=TRUE}
+New_DF$Day_Status <- ifelse(weekdays(as.Date(New_DF$date)) %in% c("Saturday", "Sunday"), "weekend", "weekday")
+```
+
+#8.Time series plot (i.e. type = "l") of the 5- minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+``` {r Time_series_plot, echo=TRUE}
+avg_step <- aggregate(steps ~ interval + Day_Status, data = New_DF, mean, na.rm = TRUE)
+
+xyplot(steps ~ interval| Day_Status, avg_step, 
+       type="l", 
+       lwd=2, 
+       xlab="Interval", 
+       ylab="Number of steps", 
+       layout=c(1,2))
+```
+
