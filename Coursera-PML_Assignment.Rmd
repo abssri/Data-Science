@@ -1,0 +1,136 @@
+---
+title: "Coursera_PracML_Assignment"
+author: "Abhinav Srivastava"
+date: "15 January 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Predict how well excercise is done
+
+##Background and Objecive:
+
+People often quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+The goal of this report was to predict the manner in which they did the exercise. Key output was to correctly classify a group of 20 test cases.
+
+In this report, data from accelerometers on the belt, forearm, arm and dumbell of 6 participants was used.
+They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har 
+
+###Data:
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+###Design Decisions:
+Data was explored using various functions available in R.Predictors were studied for relevance, their data type was observed. To choose a method for data classification following factors were considered: Natural handling of data of "mixed" type, Handling of missing values, and Ability to deal with irrelevant inputs. 
+Since Tree based methods deal with such kind of data really well(Source: ELements of Statistical Learninig, Sec 10.7, Table10.1). It was considered using Random forest and Decision Tree approached due to its relevance in the context.
+While statring modelling exrcise I thought of using  stacking apporaches post observing the accuracy and MSE and out of sample errors for RF and Decision Trees. Since RF on was able to provide classification with very high accuracy and lower OOB error stacking was not used.
+
+###Approach:
+Only those predictors were used which are present in Test set as well
+Removed variables with personal information
+Predictors with more than 53 factors were foound and converted to numeric
+Predictors with near zero variance were checked and removed
+NA' were imputed
+Feature engineering was carried out using lvq and rfe approaches.Since resulting model was not usefull- the Feature engineering using lvq and rfe was dropped off.
+Those predictors were removed which all values as NA's in test set(20 observarions)
+
+###Cross Validation:
+For cross validating the data set trainnig data was further divided (65:35) and results were validated on the 35% portion. While setting up the model it was descided that if Bias/ Variance were not found satisfactory using this approach, we would use k fold cross validation. After running Random forest model results were found satisfactory and K fold crosss validation was not used.
+
+###Accuracy and Error measures:
+The model was found to be highly acccurate with accuracy of0.977, Kappa= 0.97 and out of sample error of 0.92%.
+
+###Final Outcome:
+The observations in test set were predicted using the model developed and following results were obtained
+[1] B A B A A E D B A A B C B A E E A B B B
+Levels: A B C D E
+
+
+#Appendix
+```{r lib, warning=FALSE, message=FALSE}
+library(caret)
+library(dplyr)
+library(AppliedPredictiveModeling)
+library(DEoptim) #Feature Selection
+library(mice) #Imputation
+library(mlbench) #Feature Selection- recursive feature elimination
+library(doParallel)
+library(rpart)
+```
+
+
+```{r basic, echo= FALSE}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+test<- read.csv("pml-testing.csv", header=TRUE)
+training <- read.csv("pml-training.csv", header=TRUE)
+```
+
+###Data Treatment
+```{r Data_treatment,}
+# Remove personal identifiers, removing features not availabe in Test set
+test<-test[,-c(1:7)]
+training <- training[,-c(1:7)]
+features <- names(test[,colSums(is.na(test)) == 0])
+features <- features[1:52]
+nu_training <- training[,c(features,"classe")]
+```
+
+###Split the training data into two for training and validation
+```{r Cross Validation, warning=FALSE}
+InTrain <- createDataPartition(nu_training$classe, p= 0.65, list=FALSE)
+Train_fin <- nu_training[InTrain,]
+Test_fin <-  nu_training[-InTrain,]
+#Check for Variance
+ t<-colSums(var(Train_fin))
+```
+
+###Model- Random Forest
+```{r Modelling }
+  set.seed(100)
+  Mod_RF <- train(classe ~ ., data = Train_fin, model ="rf", ntree= 50)
+  importance <- varImp(Mod_RF)
+  Prediction_RF <- predict(Mod_RF,Test_fin)
+```
+
+####RF- Confusion Matrix, Error Rates
+```{r confusion}
+  Mod_RF$finalModel
+```
+
+####RF- Outcomes
+```{r Predict}
+  predict(Mod_RF, test)
+```
+####RF- Predictors Vs Accuracy
+
+```{r Summary}
+plot(Mod_RF)
+  
+```
+
+
+####RF- Variable Influence
+```{r vif plot}
+  plot(importance)
+```
+
+####RF- Accuracy & Kappa
+```{r RF_results}
+Mod_RF$results
+```
+
+###Model- Decision Tree
+```{r Desc Tree, eval= FALSE}
+  mod_rpart <- rpart(classe ~ . ,data = Train_fin, method="class") 
+  plot(mod_rpart)
+  Prediction_rpart <- predict(mod_rpart,Test_fin)
+  confusionMatrix(Prediction_rpart, Test_fin$classe)
+  predict(mod_rpart, test, type= "class")
+```
